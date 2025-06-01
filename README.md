@@ -122,15 +122,49 @@ defer iter.Release()
 
 ### Batch Operations
 
-Batch operations allow you to perform multiple writes atomically:
+ChainDB supports two types of batch operations with tables:
+
+#### 1. Separate batches for each table
+
+Each table creates its own batch. Such batches are committed independently.
+
+```go
+usersBatch := usersTable.NewBatch()
+settingsBatch := settingsTable.NewBatch()
+
+usersBatch.Put([]byte("user1"), []byte("John"))
+settingsBatch.Put([]byte("user1:theme"), []byte("dark"))
+
+if err := usersBatch.Write(); err != nil {
+    log.Fatal(err)
+}
+if err := settingsBatch.Write(); err != nil {
+    log.Fatal(err)
+}
+```
+
+#### 2. One common batch for all tables (atomically)
+
+You can create one batch at the database level and use it for all tables through `NewBatchFrom`. All changes will be written atomically in one operation.
 
 ```go
 batch := db.NewBatch()
-batch.Put([]byte("key1"), []byte("value1"))
-batch.Put([]byte("key2"), []byte("value2"))
-batch.Delete([]byte("key3"))
-err := batch.Write()
+usersBatch := usersTable.NewBatchFrom(batch)
+settingsBatch := settingsTable.NewBatchFrom(batch)
+
+usersBatch.Put([]byte("user1"), []byte("John"))
+settingsBatch.Put([]byte("user1:theme"), []byte("dark"))
+
+// All changes will be applied atomically
+if err := batch.Write(); err != nil {
+    log.Fatal(err)
+}
 ```
+
+**Difference:**
+
+- Variant 1 — independent batches, committed separately.
+- Variant 2 — all changes from different tables go into one batch and are committed atomically.
 
 ### Range Queries
 

@@ -343,6 +343,11 @@ func (d *pebbleDB) NewBatchWithSize(size int) Batch {
 	}
 }
 
+// NewBatchFrom creates a new batch that will write to this store but using the provided batch
+func (d *pebbleDB) NewBatchFrom(batch Batch) Batch {
+	return batch
+}
+
 // upperBound returns the upper bound for the given prefix
 func upperBound(prefix []byte) (limit []byte) {
 	for i := len(prefix) - 1; i >= 0; i-- {

@@ -118,19 +118,27 @@ func (t *table) NewBatchWithSize(size int) Batch {
 	return &tableBatch{t.db.NewBatchWithSize(size), t.prefix}
 }
 
-// tableBatch is a wrapper around a database batch that prefixes each key access
-// with a pre-configured string.
+// NewBatchFrom creates a new batch that will write to this table using the provided batch
+func (t *table) NewBatchFrom(batch Batch) Batch {
+	return &tableBatch{
+		batch:  batch,
+		prefix: t.prefix,
+	}
+}
+
+// tableBatch is a write-only database that commits changes to its host database
+// when Write is called. A batch cannot be used concurrently.
 type tableBatch struct {
 	batch  Batch
 	prefix string
 }
 
-// Put inserts the given value into the batch for later committing.
+// Put inserts the given value into the batch for key.
 func (b *tableBatch) Put(key, value []byte) error {
 	return b.batch.Put(append([]byte(b.prefix), key...), value)
 }
 
-// Delete inserts a key removal into the batch for later committing.
+// Delete removes the key from the batch.
 func (b *tableBatch) Delete(key []byte) error {
 	return b.batch.Delete(append([]byte(b.prefix), key...))
 }

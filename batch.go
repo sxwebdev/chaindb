@@ -30,4 +30,7 @@ type Batcher interface {
 
 	// NewBatchWithSize creates a write-only database batch with pre-allocated buffer.
 	NewBatchWithSize(size int) Batch
+
+	// NewBatchFrom creates a new batch that will write to this store but using the provided batch
+	NewBatchFrom(batch Batch) Batch
 }
