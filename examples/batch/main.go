@@ -9,37 +9,13 @@ import (
 	"github.com/sxwebdev/chaindb"
 )
 
-// SimpleLogger implements the chaindb.Logger interface
-type SimpleLogger struct {
-	*log.Logger
-}
-
-func (l *SimpleLogger) Debug(msg string, ctx ...any) {
-	l.Printf("[DEBUG] %s %v", msg, ctx)
-}
-
-func (l *SimpleLogger) Info(msg string, ctx ...any) {
-	l.Printf("[INFO] %s %v", msg, ctx)
-}
-
-func (l *SimpleLogger) Warn(msg string, ctx ...any) {
-	l.Printf("[WARN] %s %v", msg, ctx)
-}
-
-func (l *SimpleLogger) Error(msg string, ctx ...any) {
-	l.Printf("[ERROR] %s %v", msg, ctx)
-}
-
 func main() {
 	// Create a temporary directory for the database
 	dbPath := filepath.Join(os.TempDir(), "chaindb_batch_test")
 	defer os.RemoveAll(dbPath)
 
-	// Create a logger
-	logger := &SimpleLogger{log.New(os.Stdout, "", log.LstdFlags)}
-
 	// Open the database
-	db, err := chaindb.NewDatabase(logger, dbPath, 16, 16, false)
+	db, err := chaindb.NewDatabase(dbPath)
 	if err != nil {
 		log.Fatalf("Failed to create database: %v", err)
 	}
@@ -122,4 +98,6 @@ func main() {
 	}
 
 	fmt.Println("\nBatch operations completed successfully")
+
+	os.Exit(0)
 }

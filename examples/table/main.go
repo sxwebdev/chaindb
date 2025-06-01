@@ -9,27 +9,6 @@ import (
 	"github.com/sxwebdev/chaindb"
 )
 
-// SimpleLogger implements the chaindb.Logger interface
-type SimpleLogger struct {
-	*log.Logger
-}
-
-func (l *SimpleLogger) Debug(msg string, ctx ...any) {
-	l.Printf("[DEBUG] %s %v", msg, ctx)
-}
-
-func (l *SimpleLogger) Info(msg string, ctx ...any) {
-	l.Printf("[INFO] %s %v", msg, ctx)
-}
-
-func (l *SimpleLogger) Warn(msg string, ctx ...any) {
-	l.Printf("[WARN] %s %v", msg, ctx)
-}
-
-func (l *SimpleLogger) Error(msg string, ctx ...any) {
-	l.Printf("[ERROR] %s %v", msg, ctx)
-}
-
 // User represents a simple user structure
 type User struct {
 	ID       string
@@ -43,11 +22,8 @@ func main() {
 	dbPath := filepath.Join(os.TempDir(), "chaindb_table_test")
 	defer os.RemoveAll(dbPath)
 
-	// Create a logger
-	logger := &SimpleLogger{log.New(os.Stdout, "", log.LstdFlags)}
-
 	// Open the database
-	db, err := chaindb.NewDatabase(logger, dbPath, 16, 16, false)
+	db, err := chaindb.NewDatabase(dbPath)
 	if err != nil {
 		log.Fatalf("Failed to create database: %v", err)
 	}

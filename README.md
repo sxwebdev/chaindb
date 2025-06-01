@@ -8,9 +8,9 @@ ChainDB is a high-performance key-value database library for Go, built on top of
 - 🔒 ACID transactions: Support for atomic batch operations
 - 📊 Range queries: Efficient iteration over key ranges
 - 🔄 Compaction: Built-in support for database optimization
-- 📝 Logging: Flexible logging interface for monitoring and debugging
 - 🛠️ Simple API: Easy to use interface for common database operations
 - 📑 Table support: Namespace your data with prefixed tables
+- ⛓️ Blockchain ready: Optimized for blockchain applications with atomic operations and efficient state management
 
 ## Installation
 
@@ -27,39 +27,12 @@ package main
 
 import (
     "log"
-    "os"
-    "path/filepath"
 
     "github.com/sxwebdev/chaindb"
 )
 
-// SimpleLogger implements the chaindb.Logger interface
-type SimpleLogger struct {
-    *log.Logger
-}
-
-func (l *SimpleLogger) Debug(msg string, ctx ...any) {
-    l.Printf("[DEBUG] %s %v", msg, ctx)
-}
-
-func (l *SimpleLogger) Info(msg string, ctx ...any) {
-    l.Printf("[INFO] %s %v", msg, ctx)
-}
-
-func (l *SimpleLogger) Warn(msg string, ctx ...any) {
-    l.Printf("[WARN] %s %v", msg, ctx)
-}
-
-func (l *SimpleLogger) Error(msg string, ctx ...any) {
-    l.Printf("[ERROR] %s %v", msg, ctx)
-}
-
 func main() {
-    // Create a database instance
-    dbPath := filepath.Join(os.TempDir(), "chaindb_test")
-    logger := &SimpleLogger{log.New(os.Stdout, "", log.LstdFlags)}
-
-    db, err := chaindb.NewDatabase(logger, dbPath, 16, 16, "test", false)
+    db, err := chaindb.NewDatabase("./data")
     if err != nil {
         log.Fatal(err)
     }

@@ -35,8 +35,6 @@ type pebbleDB struct {
 	db        *pebble.DB // Underlying pebble storage engine
 	namespace string     // Namespace for metrics
 
-	log Logger
-
 	quitLock sync.RWMutex    // Mutex protecting the quit channel and the closed flag
 	quitChan chan chan error // Quit channel to stop the metrics collection before closing the database
 	closed   bool            // keep track of whether we're Closed
@@ -122,13 +120,23 @@ func (l panicLogger) Fatalf(format string, args ...interface{}) {
 }
 
 // newPebbleDB returns a wrapped pebble DB object.
-func newPebbleDB(logger Logger, file string, cache int, handles int, readonly bool) (*pebbleDB, error) {
-	// Ensure we have some minimal caching and file guarantees
-	if cache < minCache {
-		cache = minCache
+func newPebbleDB(dirname string, opts ...Option) (*pebbleDB, error) {
+	o := &options{
+		cache:    minCache,
+		handles:  minHandles,
+		readonly: false,
 	}
-	if handles < minHandles {
-		handles = minHandles
+
+	for _, opt := range opts {
+		opt(o)
+	}
+
+	// Ensure we have some minimal caching and file guarantees
+	if o.cache < minCache {
+		o.cache = minCache
+	}
+	if o.handles < minHandles {
+		o.handles = minHandles
 	}
 
 	// The max memtable size is limited by the uint32 offsets stored in
@@ -146,7 +154,7 @@ func newPebbleDB(logger Logger, file string, cache int, handles int, readonly bo
 	// Two memory tables is configured which is identical to leveldb,
 	// including a frozen memory table and another live one.
 	memTableLimit := 2
-	memTableSize := cache * 1024 * 1024 / 2 / memTableLimit
+	memTableSize := o.cache * 1024 * 1024 / 2 / memTableLimit
 
 	// The memory table size is currently capped at maxMemTableSize-1 due to a
 	// known bug in the pebble where maxMemTableSize is not recognized as a
@@ -158,10 +166,11 @@ func newPebbleDB(logger Logger, file string, cache int, handles int, readonly bo
 		memTableSize = maxMemTableSize - 1
 	}
 	db := &pebbleDB{
-		fn:       file,
-		log:      logger,
+		fn:       dirname,
 		quitChan: make(chan chan error),
+	}
 
+	if o.noSync {
 		// Use asynchronous write mode by default. Otherwise, the overhead of frequent fsync
 		// operations can be significant, especially on platforms with slow fsync performance
 		// (e.g., macOS) or less capable SSDs.
@@ -169,14 +178,17 @@ func newPebbleDB(logger Logger, file string, cache int, handles int, readonly bo
 		// Note that enabling async writes means recent data may be lost in the event of an
 		// application-level panic (writes will also be lost on a machine-level failure,
 		// of course). Geth is expected to handle recovery from an unclean shutdown.
-		writeOptions: pebble.NoSync,
+		db.writeOptions = pebble.NoSync
+	} else {
+		db.writeOptions = pebble.Sync
 	}
+
 	opt := &pebble.Options{
 		// Pebble has a single combined cache area and the write
 		// buffers are taken from this too. Assign all available
 		// memory allowance for cache.
-		Cache:        pebble.NewCache(int64(cache * 1024 * 1024)),
-		MaxOpenFiles: handles,
+		Cache:        pebble.NewCache(int64(o.cache * 1024 * 1024)),
+		MaxOpenFiles: o.handles,
 
 		// The size of memory table(as well as the write buffer).
 		// Note, there may have more than two memory tables in the system.
@@ -204,7 +216,7 @@ func newPebbleDB(logger Logger, file string, cache int, handles int, readonly bo
 			{TargetFileSize: 64 * 1024 * 1024, FilterPolicy: bloom.FilterPolicy(10)},
 			{TargetFileSize: 128 * 1024 * 1024, FilterPolicy: bloom.FilterPolicy(10)},
 		},
-		ReadOnly: readonly,
+		ReadOnly: o.readonly,
 		EventListener: &pebble.EventListener{
 			CompactionBegin: db.onCompactionBegin,
 			CompactionEnd:   db.onCompactionEnd,
@@ -213,21 +225,14 @@ func newPebbleDB(logger Logger, file string, cache int, handles int, readonly bo
 		},
 		Logger: panicLogger{}, // TODO(karalabe): Delete when this is upstreamed in Pebble
 
-		// Pebble is configured to use asynchronous write mode, meaning write operations
-		// return as soon as the data is cached in memory, without waiting for the WAL
-		// to be written. This mode offers better write performance but risks losing
-		// recent writes if the application crashes or a power failure/system crash occurs.
-		//
-		// By setting the WALBytesPerSync, the cached WAL writes will be periodically
-		// flushed at the background if the accumulated size exceeds this threshold.
-		WALBytesPerSync: 5 * IdealBatchSize,
+		WALBytesPerSync: o.walBytesPerSync,
 	}
 	// Disable seek compaction explicitly. Check https://github.com/ethereum/go-ethereum/pull/20130
 	// for more details.
 	opt.Experimental.ReadSamplingMultiplier = -1
 
 	// Open the db and recover any potential corruptions
-	innerDB, err := pebble.Open(file, opt)
+	innerDB, err := pebble.Open(dirname, opt)
 	if err != nil {
 		return nil, err
 	}
@@ -249,9 +254,6 @@ func (d *pebbleDB) Close() error {
 	if d.quitChan != nil {
 		errc := make(chan error)
 		d.quitChan <- errc
-		if err := <-errc; err != nil {
-			d.log.Error("Metrics collection failed", "err", err)
-		}
 		d.quitChan = nil
 	}
 	return d.db.Close()
