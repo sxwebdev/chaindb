@@ -203,7 +203,13 @@ func newPebbleDB(dirname string, opts ...Option) (*pebbleDB, error) {
 
 		// The default compaction concurrency(1 thread),
 		// Here use all available CPUs for faster compaction.
-		MaxConcurrentCompactions: runtime.NumCPU,
+		MaxConcurrentCompactions: func() int {
+			n := runtime.NumCPU()
+			if n > 4 {
+				return n / 2
+			}
+			return n
+		},
 
 		// Per-level options. Options for at least one level must be specified. The
 		// options for the last level are used for all subsequent levels.

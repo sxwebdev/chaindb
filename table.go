@@ -1,8 +1,8 @@
 package chaindb
 
 import (
-	"bytes"
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/cockroachdb/pebble/v2"
@@ -67,7 +67,13 @@ func (t *table) Delete(key []byte) error {
 // DeleteRange deletes all of the keys (and values) in the range [start,end)
 // (inclusive on start, exclusive on end).
 func (t *table) DeleteRange(start, end []byte) error {
-	return t.db.DeleteRange(append(t.prefix, start...), append(t.prefix, end...))
+	prefixedStart := append([]byte(nil), t.prefix...)
+	prefixedStart = append(prefixedStart, start...)
+
+	prefixedEnd := append([]byte(nil), t.prefix...)
+	prefixedEnd = append(prefixedEnd, end...)
+
+	return t.db.DeleteRange(prefixedStart, prefixedEnd)
 }
 
 // NewIterator creates a binary-alphabetical iterator over a subset
@@ -206,8 +212,8 @@ func (b *tableBatch) Write() error {
 // Reset resets the batch for reuse.
 func (b *tableBatch) Reset() {
 	b.lock.Lock()
+	defer b.lock.Unlock()
 	b.batch.Reset()
-	b.lock.Unlock()
 }
 
 // tableReplayer is a wrapper around a batch replayer which truncates
@@ -219,12 +225,18 @@ type tableReplayer struct {
 
 // Put implements the interface KeyValueWriter.
 func (r *tableReplayer) Put(key []byte, value []byte) error {
+	if key == nil || len(key) < len(r.prefix) {
+		return fmt.Errorf("key too short or nil")
+	}
 	trimmed := key[len(r.prefix):]
 	return r.w.Put(trimmed, value)
 }
 
 // Delete implements the interface KeyValueWriter.
 func (r *tableReplayer) Delete(key []byte) error {
+	if key == nil || len(key) < len(r.prefix) {
+		return fmt.Errorf("key too short or nil")
+	}
 	trimmed := key[len(r.prefix):]
 	return r.w.Delete(trimmed)
 }
@@ -275,14 +287,11 @@ func (iter *tableIterator) Error() error {
 // should not modify the contents of the returned slice, and its contents may
 // change on the next call to Next.
 func (iter *tableIterator) Key() []byte {
-	// Skip the prefix if present
 	key := iter.iter.Key()
-	if len(key) < len(iter.prefix) {
+	if key == nil || len(key) < len(iter.prefix) {
 		return nil
 	}
-	if !bytes.HasPrefix(key, iter.prefix) {
-		return nil
-	}
+	// Мы уже задали границы в опциях, так что префикс должен совпадать
 	return key[len(iter.prefix):]
 }
 
