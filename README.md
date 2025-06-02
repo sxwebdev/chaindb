@@ -39,8 +39,8 @@ func main() {
     defer db.Close()
 
     // Create a table with a prefix
-    usersTable := chaindb.NewTable(db, "users:")
-    settingsTable := chaindb.NewTable(db, "settings:")
+    usersTable := chaindb.NewTable(db, []byte("users:"))
+    settingsTable := chaindb.NewTable(db, []byte("settings:"))
 
     // Basic operations with tables
     usersTable.Put([]byte("john"), []byte("John Doe"))
@@ -75,9 +75,9 @@ Tables provide a way to namespace your data within the database. Each table auto
 
 ```go
 // Create tables for different data types
-usersTable := chaindb.NewTable(db, "users:")
-settingsTable := chaindb.NewTable(db, "settings:")
-logsTable := chaindb.NewTable(db, "logs:")
+usersTable := chaindb.NewTable(db, []byte("users:"))
+settingsTable := chaindb.NewTable(db, []byte("settings:"))
+logsTable := chaindb.NewTable(db, []byte("logs:"))
 
 // Operations on tables work the same as on the main database
 usersTable.Put([]byte("user1"), []byte("data"))

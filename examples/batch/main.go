@@ -22,9 +22,9 @@ func main() {
 	defer db.Close()
 
 	// Create tables for different data types
-	usersTable := chaindb.NewTable(db, "users:")
-	settingsTable := chaindb.NewTable(db, "settings:")
-	logsTable := chaindb.NewTable(db, "logs:")
+	usersTable := chaindb.NewTable(db, []byte("users:"))
+	settingsTable := chaindb.NewTable(db, []byte("settings:"))
+	logsTable := chaindb.NewTable(db, []byte("logs:"))
 
 	fmt.Println("Starting batch operations...")
 
