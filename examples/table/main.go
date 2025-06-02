@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -99,7 +100,7 @@ func main() {
 
 	// Example 4: Iterating over table contents
 	fmt.Println("\nExample 4: Iterating over users")
-	iter := usersTable.NewIterator(nil, nil)
+	iter := usersTable.NewIterator(context.Background(), nil, nil)
 	defer iter.Release()
 
 	fmt.Println("All users:")
@@ -126,7 +127,7 @@ func main() {
 
 	// Read all logs for user1
 	fmt.Println("User logs:")
-	logIter := logsTable.NewIterator([]byte("user1:"), nil)
+	logIter := logsTable.NewIterator(context.Background(), []byte("user1:"), nil)
 	defer logIter.Release()
 
 	for logIter.Next() {
@@ -144,7 +145,7 @@ func main() {
 	}
 
 	// Delete all settings for a user
-	settingsIter := settingsTable.NewIterator([]byte("user1:"), nil)
+	settingsIter := settingsTable.NewIterator(context.Background(), []byte("user1:"), nil)
 	defer settingsIter.Release()
 
 	for settingsIter.Next() {

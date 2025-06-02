@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -96,7 +97,7 @@ func main() {
 	// Verify the data
 	fmt.Println("\nVerifying data...")
 	verified := 0
-	iter := dataTable.NewIterator(nil, nil)
+	iter := dataTable.NewIterator(context.Background(), nil, nil)
 	defer iter.Release()
 
 	for iter.Next() {

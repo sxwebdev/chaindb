@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -88,7 +89,7 @@ func main() {
 
 	// Iterate over all users
 	fmt.Println("\nAll users:")
-	iter := usersTable.NewIterator(nil, nil)
+	iter := usersTable.NewIterator(context.Background(), nil, nil)
 	defer iter.Release()
 
 	for iter.Next() {

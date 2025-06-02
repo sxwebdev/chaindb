@@ -2,6 +2,7 @@ package chaindb
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"runtime"
 	"strings"
@@ -489,8 +490,8 @@ type pebbleIterator struct {
 // NewIterator creates a binary-alphabetical iterator over a subset
 // of database content with a particular key prefix, starting at a particular
 // initial key (or after, if it does not exist).
-func (d *pebbleDB) NewIterator(prefix []byte, start []byte) Iterator {
-	iter, _ := d.db.NewIter(&pebble.IterOptions{
+func (d *pebbleDB) NewIterator(ctx context.Context, prefix []byte, start []byte) Iterator {
+	iter, _ := d.db.NewIterWithContext(ctx, &pebble.IterOptions{
 		LowerBound: append(prefix, start...),
 		UpperBound: upperBound(prefix),
 	})

@@ -1,6 +1,7 @@
 package chaindb
 
 import (
+	"context"
 	"sync"
 
 	"github.com/cockroachdb/pebble/v2"
@@ -71,9 +72,9 @@ func (t *table) DeleteRange(start, end []byte) error {
 // NewIterator creates a binary-alphabetical iterator over a subset
 // of database content with a particular key prefix, starting at a particular
 // initial key (or after, if it does not exist).
-func (t *table) NewIterator(prefix []byte, start []byte) Iterator {
+func (t *table) NewIterator(ctx context.Context, prefix []byte, start []byte) Iterator {
 	innerPrefix := append(t.prefix, prefix...)
-	iter := t.db.NewIterator(innerPrefix, start)
+	iter := t.db.NewIterator(ctx, innerPrefix, start)
 	return &tableIterator{
 		iter:   iter,
 		prefix: t.prefix,

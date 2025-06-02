@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -50,7 +51,7 @@ func main() {
 	}
 
 	// Test Iterator
-	iter := db.NewIterator(nil, nil)
+	iter := db.NewIterator(context.Background(), nil, nil)
 	defer iter.Release()
 
 	fmt.Println("\nIterating through all keys:")
