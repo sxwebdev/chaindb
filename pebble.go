@@ -494,8 +494,21 @@ func (d *pebbleDB) NewIterator(prefix []byte, start []byte) Iterator {
 		LowerBound: append(prefix, start...),
 		UpperBound: upperBound(prefix),
 	})
-	iter.First()
-	return &pebbleIterator{iter: iter, moved: true, released: false}
+	return &pebbleIterator{iter: iter, moved: false, released: false}
+}
+
+// First moves the iterator to the first key/value pair. It returns whether the
+// iterator is exhausted.
+func (iter *pebbleIterator) First() bool {
+	iter.moved = true
+	return iter.iter.First()
+}
+
+// Last moves the iterator to the last key/value pair. It returns whether the
+// iterator is exhausted.
+func (iter *pebbleIterator) Last() bool {
+	iter.moved = true
+	return iter.iter.Last()
 }
 
 // Next moves the iterator to the next key/value pair. It returns whether the

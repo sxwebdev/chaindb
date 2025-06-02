@@ -222,6 +222,18 @@ type tableIterator struct {
 	prefix []byte
 }
 
+// First moves the iterator to the first key/value pair. It returns whether the
+// iterator is exhausted.
+func (iter *tableIterator) First() bool {
+	return iter.iter.First()
+}
+
+// Last moves the iterator to the last key/value pair. It returns whether the
+// iterator is exhausted.
+func (iter *tableIterator) Last() bool {
+	return iter.iter.Last()
+}
+
 // Next moves the iterator to the next key/value pair. It returns whether the
 // iterator is exhausted.
 func (iter *tableIterator) Next() bool {
