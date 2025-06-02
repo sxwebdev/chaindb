@@ -1,6 +1,10 @@
 package chaindb
 
-import "github.com/cockroachdb/pebble/v2"
+import (
+	"sync"
+
+	"github.com/cockroachdb/pebble/v2"
+)
 
 type Table interface {
 	Database
@@ -127,12 +131,12 @@ func (t *table) SyncKeyValue() error {
 // until a final write is called, each operation prefixing all keys with the
 // pre-configured string.
 func (t *table) NewBatch() Batch {
-	return &tableBatch{t.db.NewBatch(), t.prefix}
+	return &tableBatch{t.db.NewBatch(), t.prefix, sync.RWMutex{}}
 }
 
 // NewBatchWithSize creates a write-only database batch with pre-allocated buffer.
 func (t *table) NewBatchWithSize(size int) Batch {
-	return &tableBatch{t.db.NewBatchWithSize(size), t.prefix}
+	return &tableBatch{t.db.NewBatchWithSize(size), t.prefix, sync.RWMutex{}}
 }
 
 // NewBatchFrom creates a new batch that will write to this table using the provided batch
@@ -144,35 +148,47 @@ func (t *table) NewBatchFrom(batch Batch) Batch {
 }
 
 // tableBatch is a write-only database that commits changes to its host database
-// when Write is called. A batch cannot be used concurrently.
+// when Write is called. A batch can be used concurrently.
 type tableBatch struct {
 	batch  Batch
 	prefix []byte
+
+	lock sync.RWMutex
 }
 
 // Put inserts the given value into the batch for key.
 func (b *tableBatch) Put(key, value []byte) error {
+	b.lock.Lock()
+	defer b.lock.Unlock()
 	return b.batch.Put(append(b.prefix, key...), value)
 }
 
 // Delete removes the key from the batch.
 func (b *tableBatch) Delete(key []byte) error {
+	b.lock.Lock()
+	defer b.lock.Unlock()
 	return b.batch.Delete(append(b.prefix, key...))
 }
 
 // ValueSize retrieves the amount of data queued up for writing.
 func (b *tableBatch) ValueSize() int {
+	b.lock.RLock()
+	defer b.lock.RUnlock()
 	return b.batch.ValueSize()
 }
 
 // Write flushes any accumulated data to disk.
 func (b *tableBatch) Write() error {
+	b.lock.Lock()
+	defer b.lock.Unlock()
 	return b.batch.Write()
 }
 
 // Reset resets the batch for reuse.
 func (b *tableBatch) Reset() {
+	b.lock.Lock()
 	b.batch.Reset()
+	b.lock.Unlock()
 }
 
 // tableReplayer is a wrapper around a batch replayer which truncates
