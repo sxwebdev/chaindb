@@ -3,6 +3,8 @@ package chaindb
 import (
 	"errors"
 	"io"
+
+	"github.com/cockroachdb/pebble/v2"
 )
 
 // KeyValueReader wraps the Has and Get method of a backing data store.
@@ -71,6 +73,7 @@ type Database interface {
 	Iteratee
 	Compacter
 	io.Closer
+	Pebble() *pebble.DB
 }
 
 // NewDatabase creates a new database instance.

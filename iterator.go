@@ -14,6 +14,10 @@ type Iterator interface {
 	// iterator is exhausted.
 	Next() bool
 
+	// Prev moves the iterator to the previous key/value pair. It returns whether the
+	// iterator is exhausted.
+	Prev() bool
+
 	// Error returns any accumulated error. Exhausting all the key/value pairs
 	// is not considered to be an error.
 	Error() error

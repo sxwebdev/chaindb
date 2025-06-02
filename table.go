@@ -1,5 +1,12 @@
 package chaindb
 
+import "github.com/cockroachdb/pebble/v2"
+
+type Table interface {
+	Database
+	Prefix() []byte
+}
+
 // table is a wrapper around a database that prefixes each key access with a pre-
 // configured string.
 type table struct {
@@ -8,11 +15,21 @@ type table struct {
 }
 
 // NewTable returns a database object that prefixes all keys with a given string.
-func NewTable(db Database, prefix []byte) Database {
+func NewTable(db Database, prefix []byte) Table {
 	return &table{
 		db:     db,
 		prefix: prefix,
 	}
+}
+
+// Prefix returns the prefix of the table.
+func (t *table) Prefix() []byte {
+	return t.prefix
+}
+
+// Pebble returns the underlying pebble database.
+func (t *table) Pebble() *pebble.DB {
+	return t.db.Pebble()
 }
 
 // Close is a noop to implement the Database interface.
@@ -193,6 +210,12 @@ type tableIterator struct {
 // iterator is exhausted.
 func (iter *tableIterator) Next() bool {
 	return iter.iter.Next()
+}
+
+// Prev moves the iterator to the previous key/value pair. It returns whether the
+// iterator is exhausted.
+func (iter *tableIterator) Prev() bool {
+	return iter.iter.Prev()
 }
 
 // Error returns any accumulated error. Exhausting all the key/value pairs

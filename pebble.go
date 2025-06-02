@@ -239,6 +239,8 @@ func newPebbleDB(dirname string, opts ...Option) (*pebbleDB, error) {
 	return db, nil
 }
 
+func (d *pebbleDB) Pebble() *pebble.DB { return d.db }
+
 // Close stops the metrics collection, flushes any pending data to disk and closes
 // all io accesses to the underlying key-value store.
 func (d *pebbleDB) Close() error {
@@ -504,6 +506,16 @@ func (iter *pebbleIterator) Next() bool {
 		return iter.iter.Valid()
 	}
 	return iter.iter.Next()
+}
+
+// Prev moves the iterator to the previous key/value pair. It returns whether the
+// iterator is exhausted.
+func (iter *pebbleIterator) Prev() bool {
+	if iter.moved {
+		iter.moved = false
+		return iter.iter.Valid()
+	}
+	return iter.iter.Prev()
 }
 
 // Error returns any accumulated error. Exhausting all the key/value pairs
