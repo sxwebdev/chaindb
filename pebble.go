@@ -35,9 +35,8 @@ type pebbleDB struct {
 	db        *pebble.DB // Underlying pebble storage engine
 	namespace string     // Namespace for metrics
 
-	quitLock sync.RWMutex    // Mutex protecting the quit channel and the closed flag
-	quitChan chan chan error // Quit channel to stop the metrics collection before closing the database
-	closed   bool            // keep track of whether we're Closed
+	quitLock sync.RWMutex // Mutex protecting the quit channel and the closed flag
+	closed   bool         // keep track of whether we're Closed
 
 	activeComp    int           // Current number of active compactions
 	compStartTime time.Time     // The start time of the earliest currently-active compaction
@@ -166,8 +165,7 @@ func newPebbleDB(dirname string, opts ...Option) (*pebbleDB, error) {
 		memTableSize = maxMemTableSize - 1
 	}
 	db := &pebbleDB{
-		fn:       dirname,
-		quitChan: make(chan chan error),
+		fn: dirname,
 	}
 
 	if o.noSync {
@@ -251,11 +249,6 @@ func (d *pebbleDB) Close() error {
 		return nil
 	}
 	d.closed = true
-	if d.quitChan != nil {
-		errc := make(chan error)
-		d.quitChan <- errc
-		d.quitChan = nil
-	}
 	return d.db.Close()
 }
 

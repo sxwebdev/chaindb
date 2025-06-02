@@ -98,6 +98,4 @@ func main() {
 	}
 
 	fmt.Println("\nBatch operations completed successfully")
-
-	os.Exit(0)
 }
