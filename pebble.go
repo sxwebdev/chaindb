@@ -3,6 +3,7 @@ package chaindb
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"runtime"
 	"strings"
@@ -257,13 +258,17 @@ func (d *pebbleDB) Close() error {
 
 // Has retrieves if a key is present in the key-value store.
 func (d *pebbleDB) Has(key []byte) (bool, error) {
+	if len(key) == 0 {
+		return false, ErrEmptyKey
+	}
+
 	d.quitLock.RLock()
 	defer d.quitLock.RUnlock()
 	if d.closed {
 		return false, pebble.ErrClosed
 	}
 	_, closer, err := d.db.Get(key)
-	if err == pebble.ErrNotFound {
+	if errors.Is(err, pebble.ErrNotFound) {
 		return false, nil
 	} else if err != nil {
 		return false, err
@@ -276,6 +281,10 @@ func (d *pebbleDB) Has(key []byte) (bool, error) {
 
 // Get retrieves the given key if it's present in the key-value store.
 func (d *pebbleDB) Get(key []byte) ([]byte, error) {
+	if len(key) == 0 {
+		return nil, ErrEmptyKey
+	}
+
 	d.quitLock.RLock()
 	defer d.quitLock.RUnlock()
 	if d.closed {
@@ -295,6 +304,10 @@ func (d *pebbleDB) Get(key []byte) ([]byte, error) {
 
 // Put inserts the given value into the key-value store.
 func (d *pebbleDB) Put(key []byte, value []byte) error {
+	if len(key) == 0 {
+		return ErrEmptyKey
+	}
+
 	d.quitLock.RLock()
 	defer d.quitLock.RUnlock()
 	if d.closed {
@@ -305,6 +318,10 @@ func (d *pebbleDB) Put(key []byte, value []byte) error {
 
 // Delete removes the key from the key-value store.
 func (d *pebbleDB) Delete(key []byte) error {
+	if len(key) == 0 {
+		return ErrEmptyKey
+	}
+
 	d.quitLock.RLock()
 	defer d.quitLock.RUnlock()
 	if d.closed {
