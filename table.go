@@ -1,6 +1,7 @@
 package chaindb
 
 import (
+	"bytes"
 	"context"
 	"sync"
 
@@ -72,13 +73,29 @@ func (t *table) DeleteRange(start, end []byte) error {
 // NewIterator creates a binary-alphabetical iterator over a subset
 // of database content with a particular key prefix, starting at a particular
 // initial key (or after, if it does not exist).
-func (t *table) NewIterator(ctx context.Context, prefix []byte, start []byte) Iterator {
-	innerPrefix := append(t.prefix, prefix...)
-	iter := t.db.NewIterator(ctx, innerPrefix, start)
+func (t *table) NewIterator(ctx context.Context, iterOptions *pebble.IterOptions) (Iterator, error) {
+	var options *pebble.IterOptions
+	if iterOptions != nil {
+		options = &pebble.IterOptions{
+			LowerBound: append(t.prefix, iterOptions.LowerBound...),
+			UpperBound: append(t.prefix, iterOptions.UpperBound...),
+		}
+	} else {
+		options = &pebble.IterOptions{
+			LowerBound: t.prefix,
+			UpperBound: UpperBound(t.prefix),
+		}
+	}
+
+	iter, err := t.db.NewIterator(ctx, options)
+	if err != nil {
+		return nil, err
+	}
+
 	return &tableIterator{
 		iter:   iter,
 		prefix: t.prefix,
-	}
+	}, nil
 }
 
 // Stat returns the statistic data of the database.
@@ -145,6 +162,7 @@ func (t *table) NewBatchFrom(batch Batch) Batch {
 	return &tableBatch{
 		batch:  batch,
 		prefix: t.prefix,
+		lock:   sync.RWMutex{},
 	}
 }
 
@@ -260,7 +278,10 @@ func (iter *tableIterator) Key() []byte {
 	// Skip the prefix if present
 	key := iter.iter.Key()
 	if len(key) < len(iter.prefix) {
-		return key
+		return nil
+	}
+	if !bytes.HasPrefix(key, iter.prefix) {
+		return nil
 	}
 	return key[len(iter.prefix):]
 }

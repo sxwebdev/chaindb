@@ -1,6 +1,10 @@
 package chaindb
 
-import "context"
+import (
+	"context"
+
+	"github.com/cockroachdb/pebble/v2"
+)
 
 // Iterator iterates over a database's key/value pairs in ascending key order.
 //
@@ -54,5 +58,5 @@ type Iteratee interface {
 	//
 	// Note: This method assumes that the prefix is NOT part of the start, so there's
 	// no need for the caller to prepend the prefix to the start
-	NewIterator(ctx context.Context, prefix []byte, start []byte) Iterator
+	NewIterator(ctx context.Context, iterOptions *pebble.IterOptions) (Iterator, error)
 }
