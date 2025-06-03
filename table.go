@@ -1,5 +1,18 @@
 package chaindb
 
+import (
+	"context"
+	"fmt"
+	"sync"
+
+	"github.com/cockroachdb/pebble/v2"
+)
+
+type Table interface {
+	Database
+	Prefix() []byte
+}
+
 // table is a wrapper around a database that prefixes each key access with a pre-
 // configured string.
 type table struct {
@@ -8,11 +21,21 @@ type table struct {
 }
 
 // NewTable returns a database object that prefixes all keys with a given string.
-func NewTable(db Database, prefix []byte) Database {
+func NewTable(db Database, prefix []byte) Table {
 	return &table{
 		db:     db,
 		prefix: prefix,
 	}
+}
+
+// Prefix returns the prefix of the table.
+func (t *table) Prefix() []byte {
+	return t.prefix
+}
+
+// Pebble returns the underlying pebble database.
+func (t *table) Pebble() *pebble.DB {
+	return t.db.Pebble()
 }
 
 // Close is a noop to implement the Database interface.
@@ -44,19 +67,41 @@ func (t *table) Delete(key []byte) error {
 // DeleteRange deletes all of the keys (and values) in the range [start,end)
 // (inclusive on start, exclusive on end).
 func (t *table) DeleteRange(start, end []byte) error {
-	return t.db.DeleteRange(append(t.prefix, start...), append(t.prefix, end...))
+	prefixedStart := append([]byte(nil), t.prefix...)
+	prefixedStart = append(prefixedStart, start...)
+
+	prefixedEnd := append([]byte(nil), t.prefix...)
+	prefixedEnd = append(prefixedEnd, end...)
+
+	return t.db.DeleteRange(prefixedStart, prefixedEnd)
 }
 
 // NewIterator creates a binary-alphabetical iterator over a subset
 // of database content with a particular key prefix, starting at a particular
 // initial key (or after, if it does not exist).
-func (t *table) NewIterator(prefix []byte, start []byte) Iterator {
-	innerPrefix := append(t.prefix, prefix...)
-	iter := t.db.NewIterator(innerPrefix, start)
+func (t *table) NewIterator(ctx context.Context, iterOptions *pebble.IterOptions) (Iterator, error) {
+	var options *pebble.IterOptions
+	if iterOptions != nil {
+		options = &pebble.IterOptions{
+			LowerBound: append(t.prefix, iterOptions.LowerBound...),
+			UpperBound: append(t.prefix, iterOptions.UpperBound...),
+		}
+	} else {
+		options = &pebble.IterOptions{
+			LowerBound: t.prefix,
+			UpperBound: UpperBound(t.prefix),
+		}
+	}
+
+	iter, err := t.db.NewIterator(ctx, options)
+	if err != nil {
+		return nil, err
+	}
+
 	return &tableIterator{
 		iter:   iter,
 		prefix: t.prefix,
-	}
+	}, nil
 }
 
 // Stat returns the statistic data of the database.
@@ -110,12 +155,12 @@ func (t *table) SyncKeyValue() error {
 // until a final write is called, each operation prefixing all keys with the
 // pre-configured string.
 func (t *table) NewBatch() Batch {
-	return &tableBatch{t.db.NewBatch(), t.prefix}
+	return &tableBatch{t.db.NewBatch(), t.prefix, sync.RWMutex{}}
 }
 
 // NewBatchWithSize creates a write-only database batch with pre-allocated buffer.
 func (t *table) NewBatchWithSize(size int) Batch {
-	return &tableBatch{t.db.NewBatchWithSize(size), t.prefix}
+	return &tableBatch{t.db.NewBatchWithSize(size), t.prefix, sync.RWMutex{}}
 }
 
 // NewBatchFrom creates a new batch that will write to this table using the provided batch
@@ -123,38 +168,51 @@ func (t *table) NewBatchFrom(batch Batch) Batch {
 	return &tableBatch{
 		batch:  batch,
 		prefix: t.prefix,
+		lock:   sync.RWMutex{},
 	}
 }
 
 // tableBatch is a write-only database that commits changes to its host database
-// when Write is called. A batch cannot be used concurrently.
+// when Write is called. A batch can be used concurrently.
 type tableBatch struct {
 	batch  Batch
 	prefix []byte
+
+	lock sync.RWMutex
 }
 
 // Put inserts the given value into the batch for key.
 func (b *tableBatch) Put(key, value []byte) error {
+	b.lock.Lock()
+	defer b.lock.Unlock()
 	return b.batch.Put(append(b.prefix, key...), value)
 }
 
 // Delete removes the key from the batch.
 func (b *tableBatch) Delete(key []byte) error {
+	b.lock.Lock()
+	defer b.lock.Unlock()
 	return b.batch.Delete(append(b.prefix, key...))
 }
 
 // ValueSize retrieves the amount of data queued up for writing.
 func (b *tableBatch) ValueSize() int {
+	b.lock.RLock()
+	defer b.lock.RUnlock()
 	return b.batch.ValueSize()
 }
 
 // Write flushes any accumulated data to disk.
 func (b *tableBatch) Write() error {
+	b.lock.Lock()
+	defer b.lock.Unlock()
 	return b.batch.Write()
 }
 
 // Reset resets the batch for reuse.
 func (b *tableBatch) Reset() {
+	b.lock.Lock()
+	defer b.lock.Unlock()
 	b.batch.Reset()
 }
 
@@ -167,12 +225,18 @@ type tableReplayer struct {
 
 // Put implements the interface KeyValueWriter.
 func (r *tableReplayer) Put(key []byte, value []byte) error {
+	if key == nil || len(key) < len(r.prefix) {
+		return fmt.Errorf("key too short or nil")
+	}
 	trimmed := key[len(r.prefix):]
 	return r.w.Put(trimmed, value)
 }
 
 // Delete implements the interface KeyValueWriter.
 func (r *tableReplayer) Delete(key []byte) error {
+	if key == nil || len(key) < len(r.prefix) {
+		return fmt.Errorf("key too short or nil")
+	}
 	trimmed := key[len(r.prefix):]
 	return r.w.Delete(trimmed)
 }
@@ -189,10 +253,28 @@ type tableIterator struct {
 	prefix []byte
 }
 
+// First moves the iterator to the first key/value pair. It returns whether the
+// iterator is exhausted.
+func (iter *tableIterator) First() bool {
+	return iter.iter.First()
+}
+
+// Last moves the iterator to the last key/value pair. It returns whether the
+// iterator is exhausted.
+func (iter *tableIterator) Last() bool {
+	return iter.iter.Last()
+}
+
 // Next moves the iterator to the next key/value pair. It returns whether the
 // iterator is exhausted.
 func (iter *tableIterator) Next() bool {
 	return iter.iter.Next()
+}
+
+// Prev moves the iterator to the previous key/value pair. It returns whether the
+// iterator is exhausted.
+func (iter *tableIterator) Prev() bool {
+	return iter.iter.Prev()
 }
 
 // Error returns any accumulated error. Exhausting all the key/value pairs
@@ -205,11 +287,11 @@ func (iter *tableIterator) Error() error {
 // should not modify the contents of the returned slice, and its contents may
 // change on the next call to Next.
 func (iter *tableIterator) Key() []byte {
-	// Skip the prefix if present
 	key := iter.iter.Key()
-	if len(key) < len(iter.prefix) {
-		return key
+	if key == nil || len(key) < len(iter.prefix) {
+		return nil
 	}
+	// Мы уже задали границы в опциях, так что префикс должен совпадать
 	return key[len(iter.prefix):]
 }
 

@@ -5,7 +5,7 @@ package chaindb
 const IdealBatchSize = 100 * 1024
 
 // Batch is a write-only database that commits changes to its host database
-// when Write is called. A batch cannot be used concurrently.
+// when Write is called. Implementations of this interface can be used concurrently.
 type Batch interface {
 	KeyValueWriter
 

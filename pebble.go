@@ -2,6 +2,8 @@ package chaindb
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"fmt"
 	"runtime"
 	"strings"
@@ -201,7 +203,13 @@ func newPebbleDB(dirname string, opts ...Option) (*pebbleDB, error) {
 
 		// The default compaction concurrency(1 thread),
 		// Here use all available CPUs for faster compaction.
-		MaxConcurrentCompactions: runtime.NumCPU,
+		MaxConcurrentCompactions: func() int {
+			n := runtime.NumCPU()
+			if n > 4 {
+				return n / 2
+			}
+			return n
+		},
 
 		// Per-level options. Options for at least one level must be specified. The
 		// options for the last level are used for all subsequent levels.
@@ -239,6 +247,8 @@ func newPebbleDB(dirname string, opts ...Option) (*pebbleDB, error) {
 	return db, nil
 }
 
+func (d *pebbleDB) Pebble() *pebble.DB { return d.db }
+
 // Close stops the metrics collection, flushes any pending data to disk and closes
 // all io accesses to the underlying key-value store.
 func (d *pebbleDB) Close() error {
@@ -254,13 +264,17 @@ func (d *pebbleDB) Close() error {
 
 // Has retrieves if a key is present in the key-value store.
 func (d *pebbleDB) Has(key []byte) (bool, error) {
+	if len(key) == 0 {
+		return false, ErrEmptyKey
+	}
+
 	d.quitLock.RLock()
 	defer d.quitLock.RUnlock()
 	if d.closed {
 		return false, pebble.ErrClosed
 	}
 	_, closer, err := d.db.Get(key)
-	if err == pebble.ErrNotFound {
+	if errors.Is(err, pebble.ErrNotFound) {
 		return false, nil
 	} else if err != nil {
 		return false, err
@@ -273,6 +287,10 @@ func (d *pebbleDB) Has(key []byte) (bool, error) {
 
 // Get retrieves the given key if it's present in the key-value store.
 func (d *pebbleDB) Get(key []byte) ([]byte, error) {
+	if len(key) == 0 {
+		return nil, ErrEmptyKey
+	}
+
 	d.quitLock.RLock()
 	defer d.quitLock.RUnlock()
 	if d.closed {
@@ -292,6 +310,10 @@ func (d *pebbleDB) Get(key []byte) ([]byte, error) {
 
 // Put inserts the given value into the key-value store.
 func (d *pebbleDB) Put(key []byte, value []byte) error {
+	if len(key) == 0 {
+		return ErrEmptyKey
+	}
+
 	d.quitLock.RLock()
 	defer d.quitLock.RUnlock()
 	if d.closed {
@@ -302,6 +324,10 @@ func (d *pebbleDB) Put(key []byte, value []byte) error {
 
 // Delete removes the key from the key-value store.
 func (d *pebbleDB) Delete(key []byte) error {
+	if len(key) == 0 {
+		return ErrEmptyKey
+	}
+
 	d.quitLock.RLock()
 	defer d.quitLock.RUnlock()
 	if d.closed {
@@ -325,16 +351,18 @@ func (d *pebbleDB) DeleteRange(start, end []byte) error {
 // database until a final write is called.
 func (d *pebbleDB) NewBatch() Batch {
 	return &batch{
-		b:  d.db.NewBatch(),
-		db: d,
+		b:    d.db.NewBatch(),
+		db:   d,
+		lock: sync.RWMutex{},
 	}
 }
 
 // NewBatchWithSize creates a write-only database batch with pre-allocated buffer.
 func (d *pebbleDB) NewBatchWithSize(size int) Batch {
 	return &batch{
-		b:  d.db.NewBatchWithSize(size),
-		db: d,
+		b:    d.db.NewBatchWithSize(size),
+		db:   d,
+		lock: sync.RWMutex{},
 	}
 }
 
@@ -343,8 +371,8 @@ func (d *pebbleDB) NewBatchFrom(batch Batch) Batch {
 	return batch
 }
 
-// upperBound returns the upper bound for the given prefix
-func upperBound(prefix []byte) (limit []byte) {
+// UpperBound returns the upper bound for the given prefix
+func UpperBound(prefix []byte) (limit []byte) {
 	for i := len(prefix) - 1; i >= 0; i-- {
 		c := prefix[i]
 		if c == 0xff {
@@ -404,15 +432,19 @@ func (d *pebbleDB) SyncKeyValue() error {
 }
 
 // batch is a write-only batch that commits changes to its host database
-// when Write is called. A batch cannot be used concurrently.
+// when Write is called. This implementation is thread-safe.
 type batch struct {
 	b    *pebble.Batch
 	db   *pebbleDB
 	size int
+	lock sync.RWMutex
 }
 
 // Put inserts the given value into the batch for later committing.
 func (b *batch) Put(key, value []byte) error {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+
 	if err := b.b.Set(key, value, nil); err != nil {
 		return err
 	}
@@ -422,6 +454,9 @@ func (b *batch) Put(key, value []byte) error {
 
 // Delete inserts the key removal into the batch for later committing.
 func (b *batch) Delete(key []byte) error {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+
 	if err := b.b.Delete(key, nil); err != nil {
 		return err
 	}
@@ -431,11 +466,17 @@ func (b *batch) Delete(key []byte) error {
 
 // ValueSize retrieves the amount of data queued up for writing.
 func (b *batch) ValueSize() int {
+	b.lock.RLock()
+	defer b.lock.RUnlock()
+
 	return b.size
 }
 
 // Write flushes any accumulated data to disk.
 func (b *batch) Write() error {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+
 	b.db.quitLock.RLock()
 	defer b.db.quitLock.RUnlock()
 	if b.db.closed {
@@ -446,12 +487,18 @@ func (b *batch) Write() error {
 
 // Reset resets the batch for reuse.
 func (b *batch) Reset() {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+
 	b.b.Reset()
 	b.size = 0
 }
 
 // Replay replays the batch contents.
 func (b *batch) Replay(w KeyValueWriter) error {
+	b.lock.RLock()
+	defer b.lock.RUnlock()
+
 	reader := b.b.Reader()
 	for {
 		kind, k, v, ok, err := reader.Next()
@@ -480,30 +527,42 @@ func (b *batch) Replay(w KeyValueWriter) error {
 // The pebble iterator is not thread-safe.
 type pebbleIterator struct {
 	iter     *pebble.Iterator
-	moved    bool
 	released bool
 }
 
 // NewIterator creates a binary-alphabetical iterator over a subset
 // of database content with a particular key prefix, starting at a particular
 // initial key (or after, if it does not exist).
-func (d *pebbleDB) NewIterator(prefix []byte, start []byte) Iterator {
-	iter, _ := d.db.NewIter(&pebble.IterOptions{
-		LowerBound: append(prefix, start...),
-		UpperBound: upperBound(prefix),
-	})
-	iter.First()
-	return &pebbleIterator{iter: iter, moved: true, released: false}
+func (d *pebbleDB) NewIterator(ctx context.Context, iterOptions *pebble.IterOptions) (Iterator, error) {
+	iter, err := d.db.NewIterWithContext(ctx, iterOptions)
+	if err != nil {
+		return nil, err
+	}
+	return &pebbleIterator{iter: iter, released: false}, nil
+}
+
+// First moves the iterator to the first key/value pair. It returns whether the
+// iterator is exhausted.
+func (iter *pebbleIterator) First() bool {
+	return iter.iter.First()
+}
+
+// Last moves the iterator to the last key/value pair. It returns whether the
+// iterator is exhausted.
+func (iter *pebbleIterator) Last() bool {
+	return iter.iter.Last()
 }
 
 // Next moves the iterator to the next key/value pair. It returns whether the
 // iterator is exhausted.
 func (iter *pebbleIterator) Next() bool {
-	if iter.moved {
-		iter.moved = false
-		return iter.iter.Valid()
-	}
 	return iter.iter.Next()
+}
+
+// Prev moves the iterator to the previous key/value pair. It returns whether the
+// iterator is exhausted.
+func (iter *pebbleIterator) Prev() bool {
+	return iter.iter.Prev()
 }
 
 // Error returns any accumulated error. Exhausting all the key/value pairs
