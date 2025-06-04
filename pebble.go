@@ -104,27 +104,13 @@ func (d *pebbleDB) onWriteStallEnd() {
 	d.writeDelayStartTime = time.Time{}
 }
 
-// panicLogger is just a noop logger to disable Pebble's internal logger.
-//
-// TODO(karalabe): Remove when Pebble sets this as the default.
-type panicLogger struct{}
-
-func (l panicLogger) Infof(format string, args ...interface{}) {
-}
-
-func (l panicLogger) Errorf(format string, args ...interface{}) {
-}
-
-func (l panicLogger) Fatalf(format string, args ...interface{}) {
-	panic(fmt.Errorf("fatal: "+format, args...))
-}
-
 // newPebbleDB returns a wrapped pebble DB object.
 func newPebbleDB(dirname string, opts ...Option) (*pebbleDB, error) {
 	o := &options{
 		cache:    minCache,
 		handles:  minHandles,
 		readonly: false,
+		logger:   pebble.DefaultLogger,
 	}
 
 	for _, opt := range opts {
@@ -220,7 +206,7 @@ func newPebbleDB(dirname string, opts ...Option) (*pebbleDB, error) {
 			WriteStallBegin: db.onWriteStallBegin,
 			WriteStallEnd:   db.onWriteStallEnd,
 		},
-		Logger: panicLogger{}, // TODO(karalabe): Delete when this is upstreamed in Pebble
+		Logger: o.logger,
 
 		WALBytesPerSync: o.walBytesPerSync,
 	}

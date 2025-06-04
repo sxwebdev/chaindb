@@ -3,6 +3,7 @@ package chaindb
 import "github.com/cockroachdb/pebble/v2"
 
 type options struct {
+	logger          pebble.Logger
 	cache           int
 	handles         int
 	readonly        bool
@@ -12,6 +13,15 @@ type options struct {
 }
 
 type Option func(*options)
+
+func WithLogger(logger pebble.Logger) Option {
+	return func(o *options) {
+		if logger == nil {
+			return
+		}
+		o.logger = logger
+	}
+}
 
 func WithCache(cache int) Option {
 	return func(o *options) {
