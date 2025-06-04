@@ -47,7 +47,7 @@ type Iterator interface {
 
 	// Release releases associated resources. Release should always succeed and can
 	// be called multiple times without causing error.
-	Release()
+	Release() error
 }
 
 // Iteratee wraps the NewIterator methods of a backing data store.

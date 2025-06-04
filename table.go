@@ -311,6 +311,6 @@ func (iter *tableIterator) Value() []byte {
 
 // Release releases associated resources. Release should always succeed and can
 // be called multiple times without causing error.
-func (iter *tableIterator) Release() {
-	iter.iter.Release()
+func (iter *tableIterator) Release() error {
+	return iter.iter.Release()
 }

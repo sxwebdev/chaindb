@@ -235,7 +235,13 @@ func (d *pebbleDB) Close() error {
 	if d.closed {
 		return nil
 	}
+
+	if err := d.db.Flush(); err != nil {
+		return err
+	}
+
 	d.closed = true
+
 	return d.db.Close()
 }
 
@@ -586,9 +592,13 @@ func (iter *pebbleIterator) Value() []byte {
 
 // Release releases associated resources. Release should always succeed and can
 // be called multiple times without causing error.
-func (iter *pebbleIterator) Release() {
-	if !iter.released {
-		iter.iter.Close()
-		iter.released = true
+func (iter *pebbleIterator) Release() error {
+	if iter.released {
+		return nil
 	}
+	if err := iter.iter.Close(); err != nil {
+		return err
+	}
+	iter.released = true
+	return nil
 }
