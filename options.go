@@ -1,11 +1,14 @@
 package chaindb
 
+import "github.com/cockroachdb/pebble/v2"
+
 type options struct {
 	cache           int
 	handles         int
 	readonly        bool
 	noSync          bool
 	walBytesPerSync int
+	pebbleLevels    []pebble.LevelOptions
 }
 
 type Option func(*options)
@@ -52,5 +55,11 @@ func WithWALBytesPerSync(walBytesPerSync int) Option {
 func WithIdealWALBytesPerSync() Option {
 	return func(o *options) {
 		o.walBytesPerSync = IdealBatchSize * 5
+	}
+}
+
+func WithPebbleLevels(levels []pebble.LevelOptions) Option {
+	return func(o *options) {
+		o.pebbleLevels = levels
 	}
 }
