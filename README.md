@@ -56,6 +56,7 @@ func main() {
 
     // Batch operations with tables
     batch := usersTable.NewBatch()
+    defer batch.Close()
 
     // Safe concurrent usage of batch operations
     var wg sync.WaitGroup
@@ -108,6 +109,8 @@ settingsTable.Put([]byte("config"), []byte("value"))
 
 // Tables support all database operations
 batch := usersTable.NewBatch()
+defer batch.Close()
+
 batch.Put([]byte("user2"), []byte("data"))
 batch.Write()
 
@@ -126,7 +129,10 @@ Each table creates its own batch. Such batches are committed independently.
 
 ```go
 usersBatch := usersTable.NewBatch()
+defer usersBatch.Close()
+
 settingsBatch := settingsTable.NewBatch()
+defer settingsBatch.Close()
 
 usersBatch.Put([]byte("user1"), []byte("John"))
 settingsBatch.Put([]byte("user1:theme"), []byte("dark"))
@@ -159,6 +165,8 @@ import (
 // ...
 
 batch := db.NewBatch()
+defer batch.Close()
+
 usersBatch := usersTable.NewBatchFrom(batch)
 settingsBatch := settingsTable.NewBatchFrom(batch)
 
@@ -215,6 +223,7 @@ func main() {
 
     // Create a shared batch
     batch := userTable.NewBatch()
+    defer batch.Close()
 
     // Use the batch concurrently from multiple goroutines
     var wg sync.WaitGroup
@@ -266,6 +275,7 @@ Here's an example showing how to process data in parallel and write it atomicall
 func processDataConcurrently(db chaindb.Database, data []DataItem) error {
     table := chaindb.NewTable(db, []byte("processed:"))
     batch := table.NewBatch()
+    defer batch.Close()
 
     var wg sync.WaitGroup
     errCh := make(chan error, len(data))

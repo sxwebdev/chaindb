@@ -18,6 +18,9 @@ type Batch interface {
 	// Reset resets the batch for reuse.
 	Reset()
 
+	// Close closes the batch and releases any resources it holds.
+	Close() error
+
 	// Replay replays the batch contents.
 	Replay(w KeyValueWriter) error
 }

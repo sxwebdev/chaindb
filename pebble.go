@@ -425,10 +425,11 @@ func (d *pebbleDB) SyncKeyValue() error {
 // batch is a write-only batch that commits changes to its host database
 // when Write is called. This implementation is thread-safe.
 type batch struct {
-	b    *pebble.Batch
-	db   *pebbleDB
-	size int
-	lock sync.RWMutex
+	b      *pebble.Batch
+	db     *pebbleDB
+	size   int
+	lock   sync.RWMutex
+	closed bool
 }
 
 // Put inserts the given value into the batch for later committing.
@@ -483,6 +484,27 @@ func (b *batch) Reset() {
 
 	b.b.Reset()
 	b.size = 0
+}
+
+// Close closes the batch and releases any resources associated with it.
+func (b *batch) Close() error {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+	if b.b == nil {
+		return nil
+	}
+
+	if b.closed { // Already closed
+		return nil
+	}
+
+	if err := b.b.Close(); err != nil {
+		return err
+	}
+
+	b.closed = true
+
+	return nil
 }
 
 // Replay replays the batch contents.
