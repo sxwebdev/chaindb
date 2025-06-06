@@ -325,6 +325,8 @@ func TestTableIterator(t *testing.T) {
 		{"b", "value-b"},
 		{"c", "value-c"},
 		{"d", "value-d"},
+		{"aa", "value-aa"},
+		{"aaa", "value-aaa"},
 	}
 
 	for _, item := range data {
@@ -343,6 +345,14 @@ func TestTableIterator(t *testing.T) {
 
 	// Test Next
 	assert.True(t, iter.Next())
+	assert.Equal(t, "aa", string(iter.Key()))
+
+	// Test Next
+	assert.True(t, iter.Next())
+	assert.Equal(t, "aaa", string(iter.Key()))
+
+	// Test Next
+	assert.True(t, iter.Next())
 	assert.Equal(t, "b", string(iter.Key()))
 
 	assert.True(t, iter.Next())
@@ -355,6 +365,22 @@ func TestTableIterator(t *testing.T) {
 	// Test Prev
 	assert.True(t, iter.Prev())
 	assert.Equal(t, "c", string(iter.Key()))
+
+	iterOpts := &pebble.IterOptions{
+		LowerBound: []byte("a"),
+		UpperBound: []byte("b"),
+	}
+
+	iter2, err := table.NewIterator(context.Background(), iterOpts)
+	require.NoError(t, err)
+	defer iter2.Release()
+
+	count := 0
+	for valid := iter2.First(); valid && iter2.Error() == nil; valid = iter2.Next() {
+		count++
+	}
+
+	assert.Equal(t, 3, count)
 }
 
 func TestTable_BatchWithSize(t *testing.T) {
