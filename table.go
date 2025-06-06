@@ -80,20 +80,17 @@ func (t *table) DeleteRange(start, end []byte) error {
 // of database content with a particular key prefix, starting at a particular
 // initial key (or after, if it does not exist).
 func (t *table) NewIterator(ctx context.Context, iterOptions *pebble.IterOptions) (Iterator, error) {
-	var options *pebble.IterOptions
 	if iterOptions != nil {
-		options = &pebble.IterOptions{
-			LowerBound: append(t.prefix, iterOptions.LowerBound...),
-			UpperBound: append(t.prefix, iterOptions.UpperBound...),
-		}
+		iterOptions.LowerBound = append(t.prefix, iterOptions.LowerBound...)
+		iterOptions.UpperBound = append(t.prefix, iterOptions.UpperBound...)
 	} else {
-		options = &pebble.IterOptions{
+		iterOptions = &pebble.IterOptions{
 			LowerBound: t.prefix,
 			UpperBound: UpperBound(t.prefix),
 		}
 	}
 
-	iter, err := t.db.NewIterator(ctx, options)
+	iter, err := t.db.NewIterator(ctx, iterOptions)
 	if err != nil {
 		return nil, err
 	}
