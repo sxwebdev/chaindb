@@ -326,6 +326,7 @@ func TestTableIterator(t *testing.T) {
 		{"c", "value-c"},
 		{"d", "value-d"},
 		{"aa", "value-aa"},
+		{"aaa", "value-aaa"},
 	}
 
 	for _, item := range data {
@@ -345,6 +346,10 @@ func TestTableIterator(t *testing.T) {
 	// Test Next
 	assert.True(t, iter.Next())
 	assert.Equal(t, "aa", string(iter.Key()))
+
+	// Test Next
+	assert.True(t, iter.Next())
+	assert.Equal(t, "aaa", string(iter.Key()))
 
 	// Test Next
 	assert.True(t, iter.Next())
@@ -375,7 +380,7 @@ func TestTableIterator(t *testing.T) {
 		count++
 	}
 
-	assert.Equal(t, 2, count)
+	assert.Equal(t, 3, count)
 }
 
 func TestTable_BatchWithSize(t *testing.T) {

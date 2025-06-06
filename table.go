@@ -68,12 +68,8 @@ func (t *table) Delete(key []byte) error {
 // DeleteRange deletes all of the keys (and values) in the range [start,end)
 // (inclusive on start, exclusive on end).
 func (t *table) DeleteRange(start, end []byte) error {
-	prefixedStart := slices.Clone(t.prefix)
-	prefixedStart = append(prefixedStart, start...)
-
-	prefixedEnd := slices.Clone(t.prefix)
-	prefixedEnd = append(prefixedEnd, end...)
-
+	prefixedStart := slices.Concat(t.prefix, start)
+	prefixedEnd := slices.Concat(t.prefix, end)
 	return t.db.DeleteRange(prefixedStart, prefixedEnd)
 }
 
@@ -82,17 +78,20 @@ func (t *table) DeleteRange(start, end []byte) error {
 // initial key (or after, if it does not exist).
 func (t *table) NewIterator(ctx context.Context, iterOptions *pebble.IterOptions) (Iterator, error) {
 	if iterOptions != nil {
-		clonedLower := slices.Clone(iterOptions.LowerBound)
-		clonedUpper := slices.Clone(iterOptions.UpperBound)
+		fmt.Println("LowerBound:", string(iterOptions.LowerBound))
+		fmt.Println("UpperBound:", string(iterOptions.UpperBound))
 
-		iterOptions.LowerBound = append(t.prefix, clonedLower...)
-		iterOptions.UpperBound = append(t.prefix, clonedUpper...)
+		iterOptions.LowerBound = slices.Concat(t.prefix, iterOptions.LowerBound)
+		iterOptions.UpperBound = slices.Concat(t.prefix, iterOptions.UpperBound)
 	} else {
 		iterOptions = &pebble.IterOptions{
 			LowerBound: t.prefix,
 			UpperBound: UpperBound(t.prefix),
 		}
 	}
+
+	fmt.Println("LowerBound:", string(iterOptions.LowerBound))
+	fmt.Println("UpperBound:", string(iterOptions.UpperBound))
 
 	iter, err := t.db.NewIterator(ctx, iterOptions)
 	if err != nil {
