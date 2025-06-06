@@ -3,6 +3,7 @@ package chaindb
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sync"
 
 	"github.com/cockroachdb/pebble/v2"
@@ -30,7 +31,7 @@ func NewTable(db Database, prefix []byte) Table {
 
 // Prefix returns the prefix of the table.
 func (t *table) Prefix() []byte {
-	return t.prefix
+	return slices.Clone(t.prefix)
 }
 
 // Pebble returns the underlying pebble database.
@@ -67,10 +68,10 @@ func (t *table) Delete(key []byte) error {
 // DeleteRange deletes all of the keys (and values) in the range [start,end)
 // (inclusive on start, exclusive on end).
 func (t *table) DeleteRange(start, end []byte) error {
-	prefixedStart := append([]byte(nil), t.prefix...)
+	prefixedStart := slices.Clone(t.prefix)
 	prefixedStart = append(prefixedStart, start...)
 
-	prefixedEnd := append([]byte(nil), t.prefix...)
+	prefixedEnd := slices.Clone(t.prefix)
 	prefixedEnd = append(prefixedEnd, end...)
 
 	return t.db.DeleteRange(prefixedStart, prefixedEnd)
@@ -81,8 +82,11 @@ func (t *table) DeleteRange(start, end []byte) error {
 // initial key (or after, if it does not exist).
 func (t *table) NewIterator(ctx context.Context, iterOptions *pebble.IterOptions) (Iterator, error) {
 	if iterOptions != nil {
-		iterOptions.LowerBound = append(t.prefix, iterOptions.LowerBound...)
-		iterOptions.UpperBound = append(t.prefix, iterOptions.UpperBound...)
+		clonedLower := slices.Clone(iterOptions.LowerBound)
+		clonedUpper := slices.Clone(iterOptions.UpperBound)
+
+		iterOptions.LowerBound = append(t.prefix, clonedLower...)
+		iterOptions.UpperBound = append(t.prefix, clonedUpper...)
 	} else {
 		iterOptions = &pebble.IterOptions{
 			LowerBound: t.prefix,
