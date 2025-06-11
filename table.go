@@ -189,6 +189,15 @@ func (b *tableBatch) Delete(key []byte) error {
 	return b.batch.Delete(slices.Concat(b.prefix, key))
 }
 
+// DeleteRange deletes all of the keys (and values) in the range [start,end]
+func (b *tableBatch) DeleteRange(start, end []byte) error {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+	prefixedStart := slices.Concat(b.prefix, start)
+	prefixedEnd := slices.Concat(b.prefix, end)
+	return b.batch.DeleteRange(prefixedStart, prefixedEnd)
+}
+
 // ValueSize retrieves the amount of data queued up for writing.
 func (b *tableBatch) ValueSize() int {
 	b.lock.RLock()

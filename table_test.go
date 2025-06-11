@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/cockroachdb/pebble/v2"
@@ -536,5 +537,81 @@ func TestUpperBoundFunction(t *testing.T) {
 			fmt.Printf("Prefix: %v, Result: %v\n", tc.prefix, result)
 			assert.Equal(t, tc.expected, result)
 		})
+	}
+}
+
+func TestTableBatch_DeleteRange(t *testing.T) {
+	instance, err := NewMemDB()
+	defer instance.Close()
+	require.NoError(t, err)
+
+	prefix := []byte("prefix:")
+	table := chaindb.NewTable(instance.db, prefix)
+
+	// Insert several keys
+	for i := 0; i < 10; i++ {
+		key := []byte(fmt.Sprintf("key%d", i))
+		value := []byte(fmt.Sprintf("value%d", i))
+		err := table.Put(key, value)
+		require.NoError(t, err)
+	}
+
+	// Create a batch and delete a range
+	batch := table.NewBatch()
+	defer batch.Close()
+	err = batch.DeleteRange([]byte("key3"), []byte("key7"))
+	require.NoError(t, err)
+
+	// Write the batch
+	err = batch.Write()
+	require.NoError(t, err)
+
+	// Verify keys outside the range still exist
+	for i := range 10 {
+		key := fmt.Appendf(nil, "key%d", i)
+		exists, err := table.Has(key)
+		require.NoError(t, err)
+
+		if i >= 3 && i < 7 {
+			assert.False(t, exists, "Key %s should be deleted", key)
+		} else {
+			assert.True(t, exists, "Key %s should still exist", key)
+		}
+	}
+
+	// Test concurrent access
+	batch = table.NewBatchWithSize(1024)
+	defer batch.Close()
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		err := batch.DeleteRange([]byte("key0"), []byte("key2"))
+		require.NoError(t, err)
+	}()
+
+	go func() {
+		defer wg.Done()
+		err := batch.DeleteRange([]byte("key8"), []byte("key9"))
+		require.NoError(t, err)
+	}()
+
+	wg.Wait()
+	err = batch.Write()
+	require.NoError(t, err)
+
+	// Verify the concurrent delete operations worked
+	for i := range 10 {
+		key := fmt.Appendf(nil, "key%d", i)
+		exists, err := table.Has(key)
+		require.NoError(t, err)
+
+		if (i >= 0 && i < 2) || (i >= 3 && i < 7) || i == 8 {
+			assert.False(t, exists, "Key %s should be deleted", key)
+		} else {
+			assert.True(t, exists, "Key %s should still exist", key)
+		}
 	}
 }

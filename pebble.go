@@ -429,7 +429,17 @@ func (b *batch) Delete(key []byte) error {
 	if err := b.b.Delete(key, nil); err != nil {
 		return err
 	}
-	b.size += len(key)
+	return nil
+}
+
+// DeleteRange inserts the key range removal into the batch for later committing.
+func (b *batch) DeleteRange(start, end []byte) error {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+
+	if err := b.b.DeleteRange(start, end, nil); err != nil {
+		return err
+	}
 	return nil
 }
 

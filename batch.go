@@ -15,6 +15,9 @@ type Batch interface {
 	// Write flushes any accumulated data to disk.
 	Write() error
 
+	// DeleteRange deletes all of the keys (and values) in the range [start,end]
+	DeleteRange(start, end []byte) error
+
 	// Reset resets the batch for reuse.
 	Reset()
 
