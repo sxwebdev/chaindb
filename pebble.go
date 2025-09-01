@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -22,19 +21,14 @@ const (
 	// minHandles is the minimum number of files handles to allocate to the open
 	// database files.
 	minHandles = 16
-
-	// degradationWarnInterval specifies how often warning should be printed if the
-	// leveldb database cannot keep up with requested writes.
-	degradationWarnInterval = time.Minute
 )
 
 // Database is a persistent key-value store based on the pebble storage engine.
 // Apart from basic data storage functionality it also supports batch writes and
 // iterating over the keyspace in binary-alphabetical order.
 type pebbleDB struct {
-	fn        string     // filename for reporting
-	db        *pebble.DB // Underlying pebble storage engine
-	namespace string     // Namespace for metrics
+	fn string     // filename for reporting
+	db *pebble.DB // Underlying pebble storage engine
 
 	quitLock sync.RWMutex // Mutex protecting the quit channel and the closed flag
 	closed   bool         // keep track of whether we're Closed
@@ -68,9 +62,10 @@ func (d *pebbleDB) onCompactionBegin(info pebble.CompactionInfo) {
 }
 
 func (d *pebbleDB) onCompactionEnd(info pebble.CompactionInfo) {
-	if d.activeComp == 1 {
+	switch d.activeComp {
+	case 1:
 		d.compTime.Add(int64(time.Since(d.compStartTime)))
-	} else if d.activeComp == 0 {
+	case 0:
 		panic("should not happen")
 	}
 	d.activeComp--
@@ -185,16 +180,6 @@ func newPebbleDB(dirname string, opts ...Option) (*pebbleDB, error) {
 		// according to https://github.com/cockroachdb/pebble/blob/master/options.go#L738-L742
 		// and to https://github.com/cockroachdb/pebble/blob/master/db.go#L1892-L1903.
 		MemTableStopWritesThreshold: memTableLimit,
-
-		// The default compaction concurrency(1 thread),
-		// Here use all available CPUs for faster compaction.
-		MaxConcurrentCompactions: func() int {
-			n := runtime.NumCPU()
-			if n > 4 {
-				return n / 2
-			}
-			return n
-		},
 
 		// Per-level options. Options for at least one level must be specified. The
 		// options for the last level are used for all subsequent levels.
@@ -367,7 +352,7 @@ func (d *pebbleDB) Stat() (string, error) {
 // A nil start is treated as a key before all keys in the data store; a nil limit
 // is treated as a key after all keys in the data store. If both is nil then it
 // will compact entire data store.
-func (d *pebbleDB) Compact(start []byte, limit []byte) error {
+func (d *pebbleDB) Compact(ctx context.Context, start []byte, limit []byte) error {
 	// There is no special flag to represent the end of key range
 	// in pebble(nil in leveldb). Use an ugly hack to construct a
 	// large key to represent it.
@@ -379,7 +364,7 @@ func (d *pebbleDB) Compact(start []byte, limit []byte) error {
 	if limit == nil {
 		limit = bytes.Repeat([]byte{0xff}, 32)
 	}
-	return d.db.Compact(start, limit, true) // Parallelization is preferred
+	return d.db.Compact(ctx, start, limit, true) // Parallelization is preferred
 }
 
 // Path returns the path to the database directory.
@@ -507,15 +492,16 @@ func (b *batch) Replay(w KeyValueWriter) error {
 		}
 		// The (k,v) slices might be overwritten if the batch is reset/reused,
 		// and the receiver should copy them if they are to be retained long-term.
-		if kind == pebble.InternalKeyKindSet {
+		switch kind {
+		case pebble.InternalKeyKindSet:
 			if err = w.Put(k, v); err != nil {
 				return err
 			}
-		} else if kind == pebble.InternalKeyKindDelete {
+		case pebble.InternalKeyKindDelete:
 			if err = w.Delete(k); err != nil {
 				return err
 			}
-		} else {
+		default:
 			return fmt.Errorf("unhandled operation, keytype: %v", kind)
 		}
 	}

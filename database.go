@@ -1,6 +1,7 @@
 package chaindb
 
 import (
+	"context"
 	"errors"
 	"io"
 
@@ -58,7 +59,7 @@ type Compacter interface {
 	// A nil start is treated as a key before all keys in the data store; a nil limit
 	// is treated as a key after all keys in the data store. If both is nil then it
 	// will compact entire data store.
-	Compact(start []byte, limit []byte) error
+	Compact(ctx context.Context, start []byte, limit []byte) error
 }
 
 // Database contains all the methods required to allow handling different

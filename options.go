@@ -1,6 +1,8 @@
 package chaindb
 
-import "github.com/cockroachdb/pebble/v2"
+import (
+	"github.com/cockroachdb/pebble/v2"
+)
 
 type options struct {
 	logger          pebble.Logger
@@ -9,7 +11,7 @@ type options struct {
 	readonly        bool
 	noSync          bool
 	walBytesPerSync int
-	pebbleLevels    []pebble.LevelOptions
+	pebbleLevels    [7]pebble.LevelOptions
 }
 
 type Option func(*options)
@@ -68,7 +70,7 @@ func WithIdealWALBytesPerSync() Option {
 	}
 }
 
-func WithPebbleLevels(levels []pebble.LevelOptions) Option {
+func WithPebbleLevels(levels [7]pebble.LevelOptions) Option {
 	return func(o *options) {
 		o.pebbleLevels = levels
 	}

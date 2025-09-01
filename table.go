@@ -110,7 +110,7 @@ func (t *table) Stat() (string, error) {
 // A nil start is treated as a key before all keys in the data store; a nil limit
 // is treated as a key after all keys in the data store. If both is nil then it
 // will compact entire data store.
-func (t *table) Compact(start []byte, limit []byte) error {
+func (t *table) Compact(ctx context.Context, start []byte, limit []byte) error {
 	// If no start was specified, use the table prefix as the first value
 	if start == nil {
 		start = t.prefix
@@ -136,7 +136,7 @@ func (t *table) Compact(start []byte, limit []byte) error {
 		limit = slices.Concat(t.prefix, limit)
 	}
 	// Range correctly calculated based on table prefix, delegate down
-	return t.db.Compact(start, limit)
+	return t.db.Compact(ctx, start, limit)
 }
 
 // SyncKeyValue ensures that all pending writes are flushed to disk,
