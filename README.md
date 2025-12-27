@@ -115,7 +115,7 @@ batch.Put([]byte("user2"), []byte("data"))
 batch.Write()
 
 // Iterate over table contents
-iter := usersTable.NewIterator(nil, nil)
+iter, _ := usersTable.NewIterator(context.Background(), nil)
 defer iter.Release()
 ```
 
@@ -249,7 +249,7 @@ func main() {
 
     // Verify the data was written
     count := 0
-    iter := userTable.NewIterator(context.Background(), nil)
+    iter, _ := userTable.NewIterator(context.Background(), nil)
     defer iter.Release()
     for valid := iter.First(); valid && iter.Error() == nil; valid = iter.Next() {
         count++
@@ -364,7 +364,7 @@ ChainDB provides methods for database maintenance:
 
 ```go
 // Compact the database
-db.Compact(nil, nil)
+db.Compact(context.Background(), nil, nil)
 
 // Get database statistics
 stats, _ := db.Stat()
