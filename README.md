@@ -1,5 +1,9 @@
 # ChainDB
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/sxwebdev/chaindb.svg)](https://pkg.go.dev/github.com/sxwebdev/chaindb)
+[![Go Version](https://img.shields.io/badge/go-1.25-blue)](https://go.dev/)
+[![License](https://img.shields.io/github/license/sxwebdev/chaindb)](LICENSE)
+
 ChainDB is a high-performance key-value database library for Go, built on top of Pebble DB. It provides a simple and efficient interface for storing and retrieving data, with support for atomic batch operations, range queries, and more.
 
 ## Features
