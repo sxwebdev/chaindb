@@ -1,5 +1,9 @@
 # ChainDB
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/sxwebdev/chaindb.svg)](https://pkg.go.dev/github.com/sxwebdev/chaindb)
+[![Go Version](https://img.shields.io/badge/go-1.25-blue)](https://go.dev/)
+[![License](https://img.shields.io/github/license/sxwebdev/chaindb)](LICENSE)
+
 ChainDB is a high-performance key-value database library for Go, built on top of Pebble DB. It provides a simple and efficient interface for storing and retrieving data, with support for atomic batch operations, range queries, and more.
 
 ## Features
@@ -115,7 +119,7 @@ batch.Put([]byte("user2"), []byte("data"))
 batch.Write()
 
 // Iterate over table contents
-iter := usersTable.NewIterator(nil, nil)
+iter, _ := usersTable.NewIterator(context.Background(), nil)
 defer iter.Release()
 ```
 
@@ -249,7 +253,7 @@ func main() {
 
     // Verify the data was written
     count := 0
-    iter := userTable.NewIterator(context.Background(), nil)
+    iter, _ := userTable.NewIterator(context.Background(), nil)
     defer iter.Release()
     for valid := iter.First(); valid && iter.Error() == nil; valid = iter.Next() {
         count++
@@ -364,7 +368,7 @@ ChainDB provides methods for database maintenance:
 
 ```go
 // Compact the database
-db.Compact(nil, nil)
+db.Compact(context.Background(), nil, nil)
 
 // Get database statistics
 stats, _ := db.Stat()
