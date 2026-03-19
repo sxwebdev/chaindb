@@ -17,6 +17,16 @@ ChainDB is a high-performance key-value database library for Go, built on top of
 - 🔄 Thread-safety: All batch operations are thread-safe by default
 - ⛓️ Blockchain ready: Optimized for blockchain applications with atomic operations and efficient state management
 
+## AI Agent Skills
+
+This repository includes [AI agent skills](https://github.com/sxwebdev/skills) with documentation and usage examples for all packages. Install them with the [skills](https://github.com/sxwebdev/skills) CLI:
+
+```bash
+go install github.com/sxwebdev/skills/cmd/skills@latest
+skills init
+skills repo add sxwebdev/chaindb
+```
+
 ## Installation
 
 ```bash
