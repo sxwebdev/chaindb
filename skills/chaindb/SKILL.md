@@ -12,7 +12,7 @@ description: >-
   Applies when the user mentions Pebble DB wrapper, prefix-isolated tables, atomic
   batch writes, key-value iteration, thread-safe batch operations, or blockchain
   database storage in Go.
-user-invocable: false
+user-invocable: true
 ---
 
 # ChainDB — Pebble DB Wrapper for Go
